@@ -4,11 +4,16 @@ importing some useful packages
 """
 
 import argparse
+import os
 from os import listdir
 from os.path import isfile, join
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
+
 import numpy as np
 import cv2
 
@@ -95,7 +100,7 @@ def draw_lines(img, lines, color=[255,0,0], thickness=4):
             if m >= 0.5:
                 right_slope.append(m)
                 right_lines.append((x1,y1))
-            elif m <= -.5:
+            elif m <= -0.6:
                 left_slope.append(m)
                 left_lines.append((x2,y2))
     
@@ -171,37 +176,50 @@ def get_files(dir_path):
     return [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
 
 
+i = 0
+def process_image(img):
+    global i
+    i+= 1
+    initial_image = np.copy(img)
+    dir_name = "output_images"
+    gray_img = grayscale(img)
+    blur_gray = gaussian_noise(gray_img, 3)
+    edges = canny(blur_gray, 50, 150)
+    save_plot("output_images", str(i)+"_canny.jpg", edges)
+    
+    imshape = img.shape
+    vertices = np.array([[(110,imshape[0]),(430, 320),(480, 320), (imshape[1],imshape[0])]], dtype=np.int32)
+    masked_edges = region_of_interest(edges, vertices)
+    save_plot(dir_name, str(i)+"_roi.jpg", masked_edges)
+    
+    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 20, 10)
+    save_plot(dir_name, str(i)+"_line.jpg", lines)
+    save_plot(dir_name, str(i)+"_hough.jpg", lines)
+    
+    zeros = np.zeros_like(lines)
+    lines = np.dstack((lines, zeros, zeros))
+    final_img = weighted_img(lines, initial_image)
+    save_plot("output_images", str(i)+"_final.jpg", final_img)
+    #final_img = cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB)
+    return final_img
 
-def process_img(name, img):
+def process_images(name, img):
     """
     # 1: grayscale the image
     # 2: define edges
     # 3: Hough transform
     # 4: Apply ROI
     """
-    dir_name = "output_images"
-    initial_image = np.copy(img)
-    
-    gray_img = grayscale(img)
-    blur_gray = gaussian_noise(gray_img, 3)
-    edges = canny(blur_gray, 50, 150)
-    #save_plot("output_images", "canny_"+name, edges)
-    
-    imshape = img.shape
-    vertices = np.array([[(110,imshape[0]),(410, 320),(480, 320), (imshape[1],imshape[0])]], dtype=np.int32)
-    masked_edges = region_of_interest(edges, vertices)
-    #save_plot(dir_name, "roi_"+name, masked_edges)
-    
-    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 40, 30)
-    #save_plot(dir_name, "line_"+name, lines)
-    #save_plot(dir_name, "hough_"+name, lines)
-    
-    #lines = cv2.cvtColor(lines, cv2.COLOR_GRAY2RGB)
-    zeros = np.zeros_like(lines)
-    lines = np.dstack((lines, zeros, zeros))
-    final_img = weighted_img(lines, initial_image)
-    final_img = cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB)
-    save_plot("output_images", "final_"+name, final_img)
+    final_img = processs_image(img)
+
+
+def process_video(name):
+    """ ok """
+    _output = 'final_'+name
+    clip1 = VideoFileClip(name)
+    white_clip = clip1.fl_image(process_image) #NOTE: this function expects color images!!
+    white_clip.write_videofile(_output, audio=False)
+
 
 def main():
     """ pass """
@@ -213,6 +231,13 @@ def main():
             print("processing", name)
             img = load_image('{}/{}'.format(args.dir_path, name))
             process_img(name, img)
+    else:
+        videos = get_files(args.dir_path)
+        for name in videos:
+            if name.startswith("."): continue
+            os.chdir(args.dir_path)
+            process_video(name)
+
 
 if __name__ == '__main__':
     main()
