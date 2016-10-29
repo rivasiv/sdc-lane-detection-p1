@@ -66,7 +66,7 @@ def region_of_interest(img, vertices):
     return masked_image
 
 
-def draw_lines(img, lines, color=(255, 0, 0), thickness=1):
+def draw_lines(img, lines, color=[255,0,0], thickness=4):
     """
     NOTE: this is the function you might want to use as a starting point once you want to
     average/extrapolate the line segments you detect to map out the full
@@ -92,37 +92,36 @@ def draw_lines(img, lines, color=(255, 0, 0), thickness=1):
     for line in lines:
         for x1, y1, x2, y2 in line:
             m = ((y2-y1)/(x2-x1)) # slope
-            if m < 0:
-                left_slope.append(m)
-                left_lines.append((x2,y2))
-            else:
+            if m >= 0.5:
                 right_slope.append(m)
                 right_lines.append((x1,y1))
+            elif m <= -.5:
+                left_slope.append(m)
+                left_lines.append((x2,y2))
     
     # average left and right slopes
     right_slope = sorted(right_slope)[int(len(right_slope)/2)]
     left_slope = sorted(left_slope)[int(len(left_slope)/2)]
 
-    left_y1 = min([line[1] for line in left_lines])
-    left_pair = tuple([line[0] for line in left_lines if line[1] == left_y1] + [left_y1])
+    min_left_y1 = min([line[1] for line in left_lines])
+    min_left_x1 = min([line[0] for line in left_lines if line[1] == min_left_y1])
 
-    right_y1 = min([line[1] for line in right_lines])
-    right_pair = tuple([line[0] for line in right_lines if line[1] == right_y1] + [right_y1])
+    min_right_y1 = min([line[1] for line in right_lines])
+    min_right_x1 = min([line[0] for line in right_lines if line[1] == min_right_y1])
 
     # x2 = ((y2-y1)/m) + x1 where y2 = max height
-    left_x = int((img.shape[1]-left_pair[1])/left_slope) + left_pair[0]
-    right_x = int((img.shape[1]-right_pair[1])/right_slope) + right_pair[0]
+    # first we pick a start point on the horizon
     
-    cv2.line(img, left_pair, (left_x, img.shape[1]), color, thickness)
-    cv2.line(img, right_pair, (right_x, img.shape[1]), color, thickness)
-        
-    #left_y = int(-(m*left_min_x) - left_min_y)
-    
-    #right_y = int((right_slope * (right_max_x)) + right_max_y)
+    start_left_y = start_right_y = 325 # point on horizon
+    start_right_x = int((start_right_y-min_right_y1)/right_slope) + min_right_x1
+    start_left_x = int((start_right_y-min_left_y1)/left_slope) + min_left_x1
 
-    #    cv2.line(img, (0,left_y), (left_min_x, left_min_y), color, thickness)
-    #cv2.line(img, (0,right_y), (right_max_x, right_max_y), color, thickness)
-    #cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+    # next we exten to the car
+    end_left_x = int((img.shape[1]-min_left_y1)/left_slope) + min_left_x1
+    end_right_x = int((img.shape[1]-min_right_y1)/right_slope) + min_right_x1
+    
+    cv2.line(img, (start_left_x, start_left_y), (end_left_x, img.shape[1]), color, thickness)
+    cv2.line(img, (start_right_x, start_right_y), (end_right_x, img.shape[1]), color, thickness)
 
 
 def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
@@ -135,13 +134,16 @@ def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
                             np.array([]), minLineLength=min_line_len, maxLineGap=max_line_gap)
     line_img = np.zeros(img.shape, dtype=np.uint8)
     draw_lines(line_img, lines)
+    #for line in lines:
+    #    for x1, y1, x2, y2 in line:
+    #        cv2.line(line_img, (x1, y1), (x2, y2), [255,0,0], 2)
     return line_img
 
 
-def weighted_img(edges, line_img, alpha=0.8, beta=1., upsilon=0.):
+def weighted_img(img, initial_img, alpha=0.7, beta=0.5, upsilon=0.3):
     """
     Python 3 has support for cool math symbols.
-    `img` is the output of the hough_lines(), An image with lines drawn on it.
+    `img` is the output of the hough_lines(), An image with lines drawn on it
     Should be a blank image (all black) with lines drawn on it.
 
     `initial_img` should be the image before any processing.
@@ -151,8 +153,7 @@ def weighted_img(edges, line_img, alpha=0.8, beta=1., upsilon=0.):
     initial_img * alpha + img * beta + upsilon 
     NOTE: initial_img and img must be the same shape!
     """
-    color_edges = np.dstack((edges, edges, edges))
-    return cv2.addWeighted(color_edges, alpha, line_img, beta, upsilon)
+    return cv2.addWeighted(initial_img, alpha, img, beta, upsilon)
 
 
 def parse_args():
@@ -179,43 +180,28 @@ def process_img(name, img):
     # 4: Apply ROI
     """
     dir_name = "output_images"
-    line_image = np.copy(img)*0
- 
-    gray_img = grayscale(img)
-    #save_plot(dir_name, "gray_"+name, gray_img)
-
-    blur_gray = gaussian_noise(gray_img, 3)
-    #save_plot(dir_name, "blur_"+name, blur_gray)
-
-    edges = canny(blur_gray, 50, 150)
-    #save_plot(dir_name, "edges_"+name, edges)
-
-    imshape = img.shape
-    print(imshape[0], imshape[1])
-    vertices = np.array([[(110,imshape[0]),(410, 310),(480, 310), (imshape[1],imshape[0])]], dtype=np.int32)
-    masked_edges = region_of_interest(edges, vertices)
+    initial_image = np.copy(img)
     
+    gray_img = grayscale(img)
+    blur_gray = gaussian_noise(gray_img, 3)
+    edges = canny(blur_gray, 50, 150)
+    #save_plot("output_images", "canny_"+name, edges)
+    
+    imshape = img.shape
+    vertices = np.array([[(110,imshape[0]),(410, 320),(480, 320), (imshape[1],imshape[0])]], dtype=np.int32)
+    masked_edges = region_of_interest(edges, vertices)
     #save_plot(dir_name, "roi_"+name, masked_edges)
     
-    lines = hough_lines(masked_edges, .1, np.pi/180, 15, 120, 80)
+    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 40, 30)
+    #save_plot(dir_name, "line_"+name, lines)
     #save_plot(dir_name, "hough_"+name, lines)
-
-    final_img = weighted_img(lines, line_image)
-    #save_plot(dir_name, "final_"+name, final_img)
-
-    #images = (gray_img, blur_gray, edges, masked_edges, lines, final_img)
-    #i = 0
-    images = (final_img,)
-    i = 1
-    for _image in images:
-        plt.ion()
-        if i == 0:
-            i += 1
-            plt.imshow(_image, cmap='gray')
-        else:
-            plt.imshow(_image)
-        plt.show(block=True)
-
+    
+    #lines = cv2.cvtColor(lines, cv2.COLOR_GRAY2RGB)
+    zeros = np.zeros_like(lines)
+    lines = np.dstack((lines, zeros, zeros))
+    final_img = weighted_img(lines, initial_image)
+    final_img = cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB)
+    save_plot("output_images", "final_"+name, final_img)
 
 def main():
     """ pass """
@@ -223,9 +209,10 @@ def main():
     if args.test_on == 'images':
         images = get_files(args.dir_path)
         for name in images:
+            if name.startswith("."): continue
+            print("processing", name)
             img = load_image('{}/{}'.format(args.dir_path, name))
             process_img(name, img)
-            break
 
 if __name__ == '__main__':
     main()
