@@ -117,16 +117,16 @@ def draw_lines(img, lines, color=[255,0,0], thickness=4):
     # x2 = ((y2-y1)/m) + x1 where y2 = max height
     # first we pick a start point on the horizon
     
-    start_left_y = start_right_y = 325 # point on horizon
-    start_right_x = int((start_right_y-min_right_y1)/right_slope) + min_right_x1
-    start_left_x = int((start_right_y-min_left_y1)/left_slope) + min_left_x1
+    #start_left_y = start_right_y = 325 # point on horizon
+    #start_right_x = int((start_right_y-min_right_y1)/right_slope) + min_right_x1
+    #start_left_x = int((start_right_y-min_left_y1)/left_slope) + min_left_x1
 
-    # next we exten to the car
+    # next we extend to the car
     end_left_x = int((img.shape[1]-min_left_y1)/left_slope) + min_left_x1
     end_right_x = int((img.shape[1]-min_right_y1)/right_slope) + min_right_x1
     
-    cv2.line(img, (start_left_x, start_left_y), (end_left_x, img.shape[1]), color, thickness)
-    cv2.line(img, (start_right_x, start_right_y), (end_right_x, img.shape[1]), color, thickness)
+    cv2.line(img, (min_left_x1, min_left_y1), (end_left_x, img.shape[1]), color, thickness)
+    cv2.line(img, (min_right_x1, min_right_y1), (end_right_x, img.shape[1]), color, thickness)
 
 
 def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
@@ -192,7 +192,7 @@ def process_image(img):
     masked_edges = region_of_interest(edges, vertices)
     save_plot(dir_name, str(i)+"_roi.jpg", masked_edges)
     
-    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 20, 10)
+    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 20, 30)
     save_plot(dir_name, str(i)+"_line.jpg", lines)
     save_plot(dir_name, str(i)+"_hough.jpg", lines)
     
@@ -230,7 +230,7 @@ def main():
             if name.startswith("."): continue
             print("processing", name)
             img = load_image('{}/{}'.format(args.dir_path, name))
-            process_img(name, img)
+            process_image(img)
     else:
         videos = get_files(args.dir_path)
         for name in videos:
