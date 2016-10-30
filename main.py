@@ -97,14 +97,14 @@ def draw_lines(img, lines, color=[255,0,0], thickness=4):
 
     for line in lines:
         for x1, y1, x2, y2 in line:
-            m = ((y2-y1)/(x2-x1)) # slope
+            m = ((y1-y2)/(x1-x2)) # slope
             print(m, i)
-            if m >= 0.5:
-                right_slope.append(m)
-                right_lines.append((x1,y1))
-            elif m <= -0.3:
+            if m <= -0.2:
                 left_slope.append(m)
-                left_lines.append((x2,y2))
+                left_lines.append((x1,y1))
+            elif m >= 0.2 and m <= 0.88:
+                right_slope.append(m)
+                right_lines.append((x2,y2))
 
     # average left and right slopes
     right_slope = sorted(right_slope)[int(len(right_slope)/2)]
@@ -189,15 +189,17 @@ def process_image(img):
     dir_name = "output_images-1"
     gray_img = grayscale(img)
     blur_gray = gaussian_noise(gray_img, 3)
-    edges = canny(blur_gray, 50, 150) #114
+    edges = canny(blur_gray, 30, 70) #31
     save_plot("output_images-1", str(i)+"_canny.jpg", edges)
     
     imshape = img.shape
-    vertices = np.array([[(100,imshape[0]-80),(440, (imshape[0]/2)+60),(650, (imshape[0]/2)), (imshape[1],imshape[0])]], dtype=np.int32)
+    #print((.333*imshape[1], .708*imshape[0]),(.528*imshape[1], .597*imshape[0]), (imshape[1], .805*imshape[0]))
+    #import sys;sys.exit(1)
+    vertices = np.array([[(105, .888*imshape[0]),(.333*imshape[1], .708*imshape[0]),(.528*imshape[1], .597*imshape[0]), (imshape[1], .805*imshape[0])]], dtype=np.int32)
     masked_edges = region_of_interest(edges, vertices)
     save_plot(dir_name, str(i)+"_roi.jpg", masked_edges)
     
-    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 20, 10)
+    lines = hough_lines(masked_edges, 1, np.pi/180, 28, 10, 10)
     save_plot(dir_name, str(i)+"_line.jpg", lines)
     save_plot(dir_name, str(i)+"_hough.jpg", lines)
     
@@ -246,3 +248,10 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+"""
+1280, 720 == 675, 430
+
+960, 540 == 
+"""
