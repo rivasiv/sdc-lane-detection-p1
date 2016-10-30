@@ -96,14 +96,15 @@ def draw_lines(img, lines, color=[255,0,0], thickness=4):
 
     for line in lines:
         for x1, y1, x2, y2 in line:
-            m = ((y2-y1)/(x2-x1)) # slope
-            if m >= 0.5:
-                right_slope.append(m)
-                right_lines.append((x1,y1))
-            elif m <= -0.6:
+            m = ((y1-y2)/(x1-x2)) # slope
+            print(m, i)
+            if m <= -0.2:
                 left_slope.append(m)
-                left_lines.append((x2,y2))
-    
+                left_lines.append((x1,y1))
+            elif m >= 0.2 and m <= 0.88:
+                right_slope.append(m)
+                right_lines.append((x2,y2))
+
     # average left and right slopes
     right_slope = sorted(right_slope)[int(len(right_slope)/2)]
     left_slope = sorted(left_slope)[int(len(left_slope)/2)]
@@ -181,25 +182,25 @@ def process_image(img):
     global i
     i+= 1
     initial_image = np.copy(img)
-    dir_name = "output_images"
+    dir_name = "output_images-1"
     gray_img = grayscale(img)
     blur_gray = gaussian_noise(gray_img, 3)
-    edges = canny(blur_gray, 50, 150)
-    save_plot("output_images", str(i)+"_canny.jpg", edges)
+    edges = canny(blur_gray, 30, 60) #31
+    save_plot("output_images-1", str(i)+"_canny.jpg", edges)
     
     imshape = img.shape
-    vertices = np.array([[(110,imshape[0]),(430, 320),(480, 320), (imshape[1],imshape[0])]], dtype=np.int32)
+    vertices = np.array([[(105, .888*imshape[0]),(.333*imshape[1], .708*imshape[0]),(.528*imshape[1], .597*imshape[0]), (imshape[1], .805*imshape[0])]], dtype=np.int32)
     masked_edges = region_of_interest(edges, vertices)
     save_plot(dir_name, str(i)+"_roi.jpg", masked_edges)
     
-    lines = hough_lines(masked_edges, 1, np.pi/180, 15, 20, 10)
+    lines = hough_lines(masked_edges, 1, np.pi/180, 28, 10, 10)
     save_plot(dir_name, str(i)+"_line.jpg", lines)
     save_plot(dir_name, str(i)+"_hough.jpg", lines)
     
     zeros = np.zeros_like(lines)
     lines = np.dstack((lines, zeros, zeros))
     final_img = weighted_img(lines, initial_image)
-    save_plot("output_images", str(i)+"_final.jpg", final_img)
+    save_plot("output_images-1", str(i)+"_final.jpg", final_img)
     #final_img = cv2.cvtColor(final_img, cv2.COLOR_BGR2RGB)
     return final_img
 
@@ -233,11 +234,18 @@ def main():
             process_img(name, img)
     else:
         videos = get_files(args.dir_path)
+        os.chdir(args.dir_path)
         for name in videos:
             if name.startswith("."): continue
-            os.chdir(args.dir_path)
             process_video(name)
 
 
 if __name__ == '__main__':
     main()
+
+
+"""
+1280, 720 == 675, 430
+
+960, 540 == 
+"""
