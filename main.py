@@ -199,7 +199,7 @@ def process_image(img):
     masked_edges = region_of_interest(edges, vertices)
     save_plot(dir_name, str(i)+"_roi.jpg", masked_edges)
     
-    lines = hough_lines(masked_edges, 1, np.pi/180, 28, 10, 10)
+    lines = hough_lines(masked_edges, 1, np.pi/180, 25, 10, 10)
     save_plot(dir_name, str(i)+"_line.jpg", lines)
     save_plot(dir_name, str(i)+"_hough.jpg", lines)
     
