@@ -88,6 +88,7 @@ def draw_lines(img, lines, color=[255,0,0], thickness=4):
     If you want to make the lines semi-transparent, think about combining
     this function with the weighted_img() function below
     """
+    global i
     right_slope = []
     left_slope = []
 
@@ -107,24 +108,27 @@ def draw_lines(img, lines, color=[255,0,0], thickness=4):
 
     # average left and right slopes
     right_slope = sorted(right_slope)[int(len(right_slope)/2)]
-    left_slope = sorted(left_slope)[int(len(left_slope)/2)]
+    try:
+        left_slope = sorted(left_slope)[int(len(left_slope)/2)]
+    except:
+        print(len(left_slope))
 
-    min_left_y1 = min([line[1] for line in left_lines])
-    min_left_x1 = min([line[0] for line in left_lines if line[1] == min_left_y1])
+    start_left_y = sorted([line[1] for line in left_lines])[int(len(left_lines)/2)]
+    start_left_x = [line[0] for line in left_lines if line[1] == start_left_y][0]
 
-    min_right_y1 = min([line[1] for line in right_lines])
-    min_right_x1 = min([line[0] for line in right_lines if line[1] == min_right_y1])
-
+    start_right_y = sorted([line[1] for line in right_lines])[int(len(right_lines)/2)]
+    start_right_x = [line[0] for line in right_lines if line[1] == start_right_y][0]
+    
     # x2 = ((y2-y1)/m) + x1 where y2 = max height
     # first we pick a start point on the horizon
     
-    start_left_y = start_right_y = 325 # point on horizon
-    start_right_x = int((start_right_y-min_right_y1)/right_slope) + min_right_x1
-    start_left_x = int((start_right_y-min_left_y1)/left_slope) + min_left_x1
+    #start_left_y = start_right_y = 325 # point on horizon
+    #start_right_x = int((start_right_y-min_right_y1)/right_slope) + min_right_x1
+    #start_left_x = int((start_right_y-min_left_y1)/left_slope) + min_left_x1
 
-    # next we exten to the car
-    end_left_x = int((img.shape[1]-min_left_y1)/left_slope) + min_left_x1
-    end_right_x = int((img.shape[1]-min_right_y1)/right_slope) + min_right_x1
+    # next we extend to the car
+    end_left_x = int((img.shape[1]-start_left_y)/left_slope) + start_left_x
+    end_right_x = int((img.shape[1]-start_right_y)/right_slope) + start_right_x
     
     cv2.line(img, (start_left_x, start_left_y), (end_left_x, img.shape[1]), color, thickness)
     cv2.line(img, (start_right_x, start_right_y), (end_right_x, img.shape[1]), color, thickness)
@@ -185,15 +189,18 @@ def process_image(img):
     dir_name = "output_images-1"
     gray_img = grayscale(img)
     blur_gray = gaussian_noise(gray_img, 3)
-    edges = canny(blur_gray, 30, 60) #31
+
+    edges = canny(blur_gray, 40, 70) #31
     save_plot("output_images-1", str(i)+"_canny.jpg", edges)
     
     imshape = img.shape
+
     vertices = np.array([[(105, .888*imshape[0]),(.333*imshape[1], .708*imshape[0]),(.528*imshape[1], .597*imshape[0]), (imshape[1], .805*imshape[0])]], dtype=np.int32)
     masked_edges = region_of_interest(edges, vertices)
     save_plot(dir_name, str(i)+"_roi.jpg", masked_edges)
-    
-    lines = hough_lines(masked_edges, 1, np.pi/180, 28, 10, 10)
+
+    lines = hough_lines(masked_edges, 1, np.pi/180, 25, 10, 10)
+
     save_plot(dir_name, str(i)+"_line.jpg", lines)
     save_plot(dir_name, str(i)+"_hough.jpg", lines)
     
@@ -231,12 +238,12 @@ def main():
             if name.startswith("."): continue
             print("processing", name)
             img = load_image('{}/{}'.format(args.dir_path, name))
-            process_img(name, img)
+            process_image(img)
     else:
-        videos = get_files(args.dir_path)
+        videos = list(get_files(args.dir_path))
         os.chdir(args.dir_path)
         for name in videos:
-            if name.startswith("."): continue
+            if name.startswith(".") or 'mp4' not in name: continue
             process_video(name)
 
 
