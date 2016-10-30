@@ -189,7 +189,7 @@ def process_image(img):
     dir_name = "output_images-1"
     gray_img = grayscale(img)
     blur_gray = gaussian_noise(gray_img, 3)
-    edges = canny(blur_gray, 30, 70) #31
+    edges = canny(blur_gray, 40, 70) #31
     save_plot("output_images-1", str(i)+"_canny.jpg", edges)
     
     imshape = img.shape
